@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <SDL2/SDL.h>
 
+#include "awe_macos.h"
+#include "game.cc"
+
 #define internal static
 #define global_variable static
 #define local_persist static
@@ -10,55 +13,33 @@ global_variable bool Running = true;
 #define WindowWidth 1280
 #define WindowHeight 1024
 
-global_variable int BitmapWidth = 0;
-global_variable int BitmapHeight = 0;
+SDL_Texture *WindowTexture;
 
-global_variable SDL_Texture *WindowTexture;
-global_variable void *Pixels;
-
-internal void Render(int Width, int Height, int XOffset, int YOffset)
+internal void SDLUpdateWindow(offscreen_buffer *global_backbuffer, SDL_Window *Window, SDL_Renderer *Renderer)
 {
-    int Pitch = Width * sizeof(uint32_t);
-
-    uint8_t *Row = (uint8_t *)Pixels;
-    for(int Y = 0; Y < Height; ++Y)
-    {
-        uint32_t *Pixel = (uint32_t *)Row;
-        for(int X = 0; X < Width; ++X)
-        {
-            uint8_t Blue = Y + YOffset;
-            uint8_t Green = 0;
-            uint8_t Red = X + XOffset;
-
-            *Pixel++ = (uint32_t)((Red << 16) | (Green << 8) | Blue);
-        }
-        Row += Pitch;
-    }
-}
-
-internal void SDLUpdateWindow(SDL_Window *Window, SDL_Renderer *Renderer)
-{
-    SDL_UpdateTexture(WindowTexture, 0, Pixels, BitmapWidth * sizeof(uint32_t));
+    SDL_UpdateTexture(WindowTexture, 0, global_backbuffer->Pixels, global_backbuffer->Width * global_backbuffer->BytesPerPixel);
     SDL_RenderCopy(Renderer, WindowTexture, 0, 0);
     SDL_RenderPresent(Renderer);
 }
 
-internal void ResizeTexture(SDL_Renderer *Renderer, int w, int h) {
+internal void ResizeTexture(offscreen_buffer *global_backbuffer, SDL_Renderer *Renderer) {
     if (WindowTexture) {
         SDL_DestroyTexture(WindowTexture);
         WindowTexture = NULL;
     }
 
-    if (Pixels) {
-        free(Pixels);
-        Pixels = NULL;
+    if (global_backbuffer->Pixels) {
+        free(global_backbuffer->Pixels);
+        global_backbuffer->Pixels = NULL;
     }
 
+    int w = global_backbuffer->Width;
+    int h = global_backbuffer->Height; 
     WindowTexture = SDL_CreateTexture(Renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, w, h);
-    Pixels = (uint32_t *)malloc(w * h * sizeof(uint32_t));
+    global_backbuffer->Pixels = (uint32_t *)malloc(w * h * global_backbuffer->BytesPerPixel);
 }
 
-internal void ProcessInput(void) 
+internal void ProcessInput(offscreen_buffer *global_backbuffer, SDL_Renderer *Renderer) 
 {
     SDL_Event Event;
 
@@ -77,17 +58,17 @@ internal void ProcessInput(void)
                 {
                     case SDL_WINDOWEVENT_SIZE_CHANGED:
                     {
-                        BitmapWidth = Event.window.data1;
-                        BitmapHeight = Event.window.data2;
+                        global_backbuffer->Width = Event.window.data1;
+                        global_backbuffer->Height = Event.window.data2;
                         SDL_Window *Window = SDL_GetWindowFromID(Event.window.windowID);
                         SDL_Renderer *Renderer = SDL_GetRenderer(Window);
-                        ResizeTexture(Renderer, BitmapWidth, BitmapHeight);
+                        ResizeTexture(global_backbuffer, Renderer);
                     } break;
                     case SDL_WINDOWEVENT_EXPOSED:
                     {
                         SDL_Window *Window = SDL_GetWindowFromID(Event.window.windowID);
                         SDL_Renderer *Renderer = SDL_GetRenderer(Window);
-                        SDLUpdateWindow(Window, Renderer);
+                        SDLUpdateWindow(global_backbuffer, Window, Renderer);
                     } break;
                 }
             } break;
@@ -117,21 +98,28 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    SDL_GetWindowSize(Window, &BitmapWidth, &BitmapHeight);
-    ResizeTexture(Renderer, BitmapWidth, BitmapHeight);
+    int w, h;
+    SDL_GetWindowSize(Window, &w, &h);
+
+    offscreen_buffer global_backbuffer = {};
+    global_backbuffer.BytesPerPixel = sizeof(uint32_t);
+    global_backbuffer.Width = w;
+    global_backbuffer.Height = h;
+
+    ResizeTexture(&global_backbuffer, Renderer);
 
     int XOffset = 0;
     int YOffset = 0;
 
     while (Running) {
-        ProcessInput();
-        Render(BitmapWidth, BitmapHeight, XOffset, YOffset);
-        SDLUpdateWindow(Window, Renderer);
+        ProcessInput(&global_backbuffer, Renderer);
+        Render(global_backbuffer.Pixels, global_backbuffer.Width, global_backbuffer.Height, XOffset, YOffset);
+        SDLUpdateWindow(&global_backbuffer, Window, Renderer);
 
         ++XOffset;
-        XOffset %= BitmapWidth;
+        XOffset %= global_backbuffer.Width;
         ++YOffset;
-        YOffset %= BitmapHeight;
+        YOffset %= global_backbuffer.Height;
     }
 
     if (Renderer) {
@@ -149,8 +137,8 @@ int main(int argc, char *argv[])
         WindowTexture = NULL;
     }
 
-    if (Pixels) {
-        free(Pixels);
+    if (global_backbuffer.Pixels) {
+        free(global_backbuffer.Pixels);
     }
 
     SDL_Quit();
