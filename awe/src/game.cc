@@ -4,15 +4,15 @@
 #define global_variable static
 #define local_persist static
 
-internal void Render(void *Pixels, int Width, int Height, int XOffset, int YOffset)
+internal void Render(offscreen_buffer *buffer, int XOffset, int YOffset)
 {
-    int Pitch = Width * sizeof(uint32_t);
+    int Pitch = buffer->Width * buffer->BytesPerPixel;
 
-    uint8_t *Row = (uint8_t *)Pixels;
-    for(int Y = 0; Y < Height; ++Y)
+    uint8_t *Row = (uint8_t *)buffer->Pixels;
+    for(int Y = 0; Y < buffer->Height; ++Y)
     {
         uint32_t *Pixel = (uint32_t *)Row;
-        for(int X = 0; X < Width; ++X)
+        for(int X = 0; X < buffer->Width; ++X)
         {
             uint8_t Blue = Y + YOffset;
             uint8_t Green = 0;
