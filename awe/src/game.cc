@@ -1,10 +1,8 @@
 #include <stdint.h>
 
-#define internal static
-#define global_variable static
-#define local_persist static
+#include "game.h"
 
-internal void Render(offscreen_buffer *buffer, int XOffset, int YOffset)
+void Render(offscreen_buffer *buffer, int XOffset, int YOffset)
 {
     int Pitch = buffer->Width * buffer->BytesPerPixel;
 

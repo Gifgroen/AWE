@@ -2,8 +2,8 @@
 #include <sys/mman.h>
 #include <SDL2/SDL.h>
 
-#include "awe_macos.h"
-#include "game.cc"
+#include "awe_macos.h"  // MacOS Platform Layer
+#include "game.cc"      // Game "service" to be used by platform
 
 #define internal static
 #define global_variable static
@@ -20,19 +20,23 @@ internal void SDLUpdateWindow(offscreen_buffer *buffer, SDL_Texture *WindowTextu
     SDL_RenderPresent(Renderer);
 }
 
-internal window_dimension SDLGetWindowDimensions(SDL_Window *Window) {
+internal window_dimension SDLGetWindowDimension(SDL_Window *Window) 
+{
     window_dimension Result = {};
     SDL_GetWindowSize(Window, &Result.Width, &Result.Height);
     return Result;
 }
 
-internal void SDLResizeTexture(offscreen_buffer *buffer, window_dimension NewDimensions, SDL_Renderer *Renderer) {
-    if (WindowTexture) {
+internal void SDLResizeTexture(offscreen_buffer *buffer, window_dimension NewDimensions, SDL_Renderer *Renderer) 
+{
+    if (WindowTexture) 
+    {
         SDL_DestroyTexture(WindowTexture);
         WindowTexture = NULL;
     }
 
-    if (buffer->Pixels) {
+    if (buffer->Pixels) 
+    {
         munmap(buffer->Pixels, buffer->Width * buffer->Height * buffer->BytesPerPixel);
     }
 
@@ -43,6 +47,7 @@ internal void SDLResizeTexture(offscreen_buffer *buffer, window_dimension NewDim
     buffer->Pixels = mmap(0, Width * Height * buffer->BytesPerPixel, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
     buffer->Width = Width;
     buffer->Height = Height;
+    buffer->Pitch = buffer->Width * buffer->BytesPerPixel;
 }
 
 internal void ProcessInput(offscreen_buffer *buffer, SDL_Renderer *Renderer) 
@@ -111,7 +116,7 @@ int main(int argc, char *argv[])
     offscreen_buffer offscreen_buffer = {};
     offscreen_buffer.BytesPerPixel = sizeof(uint32_t);
 
-    window_dimension newDim = SDLGetWindowDimensions(Window);
+    window_dimension newDim = SDLGetWindowDimension(Window);
     offscreen_buffer.Pitch = offscreen_buffer.BytesPerPixel * newDim.Width;
     SDLResizeTexture(&offscreen_buffer, newDim, Renderer);
 
