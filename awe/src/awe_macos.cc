@@ -13,6 +13,32 @@ global_variable bool Running = true;
 
 SDL_Texture *WindowTexture;
 
+global_variable int MAX_CONTROLLERS = 4;
+
+internal int SDLSetupGameControllers(int ControllerCount, SDL_GameController *Result[]) {
+    int ConnectedControllerCount = 0;
+    for(int controllerIndex = 0; controllerIndex < ControllerCount; ++controllerIndex) {
+        if (!SDL_IsGameController(controllerIndex))
+        {
+            printf("Not a game controller!\n");
+            continue;
+        }
+        if (controllerIndex >= MAX_CONTROLLERS)
+        {
+            printf("Max controller count reached!\n");
+            break;
+        }
+        Result[controllerIndex] = SDL_GameControllerOpen(controllerIndex);
+        if(Result[controllerIndex] == NULL)
+        {
+            printf("Warning: Unable to open game controller! SDL Error: %s\n", SDL_GetError());
+            continue;
+        }
+        ++ConnectedControllerCount;
+    }
+    return ConnectedControllerCount;
+}
+
 internal void SDLUpdateWindow(offscreen_buffer *buffer, SDL_Texture *WindowTexture, SDL_Renderer *Renderer)
 {
     SDL_UpdateTexture(WindowTexture, 0, buffer->Pixels, buffer->Width * buffer->BytesPerPixel);
@@ -89,14 +115,22 @@ internal void ProcessInput(offscreen_buffer *buffer, SDL_Renderer *Renderer)
 
 int main(int argc, char *argv[]) 
 {
-    int32_t InitFlags = SDL_INIT_VIDEO;
-    if (SDL_Init(InitFlags) != 0) 
+    int32_t SubsystemFlags = SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER;
+    if (SDL_Init(SubsystemFlags) != 0)
     {
         // TODO: Logging!
         printf("Loading SDL failed! %s\n", SDL_GetError());
         return -1;
     }
     
+    // Setup Controller subsystem!
+    int ControllerCount = SDL_NumJoysticks();
+
+    // TODO: assert that ControllerCount <= MAX_CONTROLLERS
+    SDL_GameController *ControllerHandles[MAX_CONTROLLERS];
+    int ConnectedControllerCount = SDLSetupGameControllers(ControllerCount, ControllerHandles);
+
+    // Setup Window
     const char *Title = "AWE Game Engine";
     int Top = SDL_WINDOWPOS_UNDEFINED;
     int Left = SDL_WINDOWPOS_UNDEFINED;
@@ -126,13 +160,50 @@ int main(int argc, char *argv[])
     while (Running) 
     {
         ProcessInput(&offscreen_buffer, Renderer);
+        for (int ControllerIndex = 0; ControllerIndex < ConnectedControllerCount; ++ControllerIndex)
+        {
+            SDL_GameController *Controller = ControllerHandles[ControllerIndex];
+            if(Controller != NULL && SDL_GameControllerGetAttached(Controller))
+            {
+                // TODO: process input from this connected GameController
+
+                if (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_UP))
+                {
+                    ++YOffset;
+                }
+                if (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN))
+                {
+                    --YOffset;
+                }
+
+                if (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT))
+                {
+                    ++XOffset;
+                }
+                if (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT))
+                {
+                    --XOffset;
+                }
+            }
+            else
+            {
+                // TODO: Logging!
+            }
+        }
+
         Render(&offscreen_buffer, XOffset, YOffset);
         SDLUpdateWindow(&offscreen_buffer, WindowTexture, Renderer);
+    }
 
-        ++XOffset;
-        XOffset %= offscreen_buffer.Width;
-        ++YOffset;
-        YOffset %= offscreen_buffer.Height;
+    for (int i = 0; i < ConnectedControllerCount; ++i)
+    {
+        SDL_GameController *controller = ControllerHandles[i];
+        if (!controller)
+        {
+            printf("Could not close gamecontroller %i: %s\n", i, SDL_GetError());
+            continue;
+        }
+        SDL_GameControllerClose(controller);
     }
 
     if (Renderer) 
