@@ -79,23 +79,20 @@ internal int SDLSetupGameControllers(SDL_GameController *Result[]) {
     return ConnectedControllerCount;
 }
 
-internal void SDLProcessGameControllerButton(
-    game_button_state *OldState, 
-    game_button_state *NewState, 
-    SDL_GameController *ControllerHandle, 
-    SDL_GameControllerButton Button
-)
+internal void SDLProcessGameControllerButton(game_button_state *OldState, game_button_state *NewState, bool Value)
 {
-    NewState->EndedDown = SDL_GameControllerGetButton(ControllerHandle, Button);
-    NewState->HalfTransitionCount += ((NewState->EndedDown == OldState->EndedDown)?0:1);
+    NewState->EndedDown = Value;
+    NewState->HalfTransitionCount += (OldState->EndedDown == NewState->EndedDown) ? 0 : 1;
 }
 
 internal void SDLProcessKeyPress(game_button_state *NewState, bool IsDown)
 {
-    if (NewState->EndedDown != IsDown) {
-        NewState->EndedDown = IsDown;
-        ++NewState->HalfTransitionCount;
+    if (NewState->EndedDown == IsDown) {
+        return;
     }
+    NewState->EndedDown = IsDown;
+    ++NewState->HalfTransitionCount;
+
 }
 
 // Keyboard/Mouse Input 
@@ -116,35 +113,19 @@ internal void ProcessInput(offscreen_buffer *buffer, SDL_Renderer *Renderer, gam
 
                 if (Event.key.repeat == 0)
                 {
-                    if(KeyCode == SDLK_UP) 
+                    if(KeyCode == SDLK_UP || KeyCode == SDLK_w)
                     {
                         SDLProcessKeyPress(&KeyboardController->MoveUp, IsDown);
                     }
-                    else if(KeyCode == SDLK_LEFT) 
+                    else if(KeyCode == SDLK_LEFT || KeyCode == SDLK_a)
                     {
                         SDLProcessKeyPress(&KeyboardController->MoveLeft, IsDown);
                     }
-                    else if(KeyCode == SDLK_DOWN) 
+                    else if(KeyCode == SDLK_DOWN || KeyCode == SDLK_s)
                     {
                         SDLProcessKeyPress(&KeyboardController->MoveDown, IsDown);
                     }
-                    else if(KeyCode == SDLK_RIGHT) 
-                    {
-                        SDLProcessKeyPress(&KeyboardController->MoveRight, IsDown);
-                    }
-                    else if(KeyCode == SDLK_w) 
-                    {
-                        SDLProcessKeyPress(&KeyboardController->MoveUp, IsDown);
-                    }
-                    else if(KeyCode == SDLK_a) 
-                    {
-                        SDLProcessKeyPress(&KeyboardController->MoveLeft, IsDown);
-                    }
-                    else if(KeyCode == SDLK_s) 
-                    {
-                        SDLProcessKeyPress(&KeyboardController->MoveDown, IsDown);
-                    }
-                    else if(KeyCode == SDLK_d) 
+                    else if(KeyCode == SDLK_RIGHT || KeyCode == SDLK_d)
                     {
                         SDLProcessKeyPress(&KeyboardController->MoveRight, IsDown);
                     }
@@ -237,7 +218,7 @@ int main(int argc, char *argv[])
     {
         game_controller_input *OldKeyboardController = &OldInput->KeyboardController[0];
         game_controller_input *NewKeyboardController = &NewInput->KeyboardController[0];
-        // *NewKeyboardController = {0};
+        *NewKeyboardController = {0};
         for(int ButtonIndex = 0; ButtonIndex < ArrayCount(NewKeyboardController->Buttons); ++ButtonIndex) {
             NewKeyboardController->Buttons[ButtonIndex].EndedDown =
             OldKeyboardController->Buttons[ButtonIndex].EndedDown;
@@ -255,10 +236,10 @@ int main(int argc, char *argv[])
             {
                 // TODO: process input from this connected GameController
 
-                SDLProcessGameControllerButton(&(OldController->MoveUp), &(NewController->MoveUp), Controller, SDL_CONTROLLER_BUTTON_DPAD_UP);
-                SDLProcessGameControllerButton(&(OldController->MoveLeft), &(NewController->MoveLeft), Controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
-                SDLProcessGameControllerButton(&(OldController->MoveDown), &(NewController->MoveDown), Controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
-                SDLProcessGameControllerButton(&(OldController->MoveRight), &(NewController->MoveRight), Controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+                SDLProcessGameControllerButton(&(OldController->MoveUp), &(NewController->MoveUp), SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_UP));
+                SDLProcessGameControllerButton(&(OldController->MoveLeft), &(NewController->MoveLeft), SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT));
+                SDLProcessGameControllerButton(&(OldController->MoveDown), &(NewController->MoveDown), SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN));
+                SDLProcessGameControllerButton(&(OldController->MoveRight), &(NewController->MoveRight), SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT));
 
                 // TODO: process Joystick and Moar Buttons
             }
