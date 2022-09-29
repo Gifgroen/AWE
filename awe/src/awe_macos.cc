@@ -11,34 +11,11 @@
 
 global_variable bool Running = true;
 
+#define ArrayCount(Array) (sizeof(Array) / sizeof(*(Array)))
+
 SDL_Texture *WindowTexture;
 
-global_variable int MAX_CONTROLLERS = 4;
-
-internal int SDLSetupGameControllers(int ControllerCount, SDL_GameController *Result[]) {
-    int ConnectedControllerCount = 0;
-    for(int controllerIndex = 0; controllerIndex < ControllerCount; ++controllerIndex) {
-        if (!SDL_IsGameController(controllerIndex))
-        {
-            printf("Not a game controller!\n");
-            continue;
-        }
-        if (controllerIndex >= MAX_CONTROLLERS)
-        {
-            printf("Max controller count reached!\n");
-            break;
-        }
-        Result[controllerIndex] = SDL_GameControllerOpen(controllerIndex);
-        if(Result[controllerIndex] == NULL)
-        {
-            printf("Warning: Unable to open game controller! SDL Error: %s\n", SDL_GetError());
-            continue;
-        }
-        ++ConnectedControllerCount;
-    }
-    return ConnectedControllerCount;
-}
-
+// Rendering
 internal void SDLUpdateWindow(offscreen_buffer *buffer, SDL_Texture *WindowTexture, SDL_Renderer *Renderer)
 {
     SDL_UpdateTexture(WindowTexture, 0, buffer->Pixels, buffer->Width * buffer->BytesPerPixel);
@@ -76,7 +53,53 @@ internal void SDLResizeTexture(offscreen_buffer *buffer, window_dimension NewDim
     buffer->Pitch = buffer->Width * buffer->BytesPerPixel;
 }
 
-internal void ProcessInput(offscreen_buffer *buffer, SDL_Renderer *Renderer) 
+// GamePad/Joystick Input
+internal int SDLSetupGameControllers(SDL_GameController *Result[]) {
+    int ControllerCount = SDL_NumJoysticks();
+    int ConnectedControllerCount = 0;
+    for(int ControllerIndex = 0; ControllerIndex < ControllerCount; ++ControllerIndex) {
+        if (!SDL_IsGameController(ControllerIndex))
+        {
+            printf("Not a game controller!\n");
+            continue;
+        }
+        if (ControllerIndex >= MAX_CONTROLLERS)
+        {
+            printf("Max controller count reached!\n");
+            break;
+        }
+        Result[ControllerIndex] = SDL_GameControllerOpen(ControllerIndex);
+        if(Result[ControllerIndex] == NULL)
+        {
+            printf("Warning: Unable to open game controller! SDL Error: %s\n", SDL_GetError());
+            continue;
+        }
+        ++ConnectedControllerCount;
+    }
+    return ConnectedControllerCount;
+}
+
+internal void SDLProcessGameControllerButton(
+    game_button_state *OldState, 
+    game_button_state *NewState, 
+    SDL_GameController *ControllerHandle, 
+    SDL_GameControllerButton Button
+)
+{
+    NewState->EndedDown = SDL_GameControllerGetButton(ControllerHandle, Button);
+    NewState->HalfTransitionCount += ((NewState->EndedDown == OldState->EndedDown)?0:1);
+}
+
+internal void SDLProcessKeyPress(game_button_state *NewState, bool IsDown)
+{
+    if (NewState->EndedDown != IsDown) {
+        NewState->EndedDown = IsDown;
+        ++NewState->HalfTransitionCount;
+    }
+}
+
+// Keyboard/Mouse Input 
+internal void ProcessInput(offscreen_buffer *buffer, SDL_Renderer *Renderer, game_controller_input *KeyboardController) 
 {
     SDL_Event Event;
 
@@ -84,6 +107,57 @@ internal void ProcessInput(offscreen_buffer *buffer, SDL_Renderer *Renderer)
     {
         switch(Event.type)
         {
+            case SDL_KEYDOWN:
+            case SDL_KEYUP: 
+            {
+                SDL_Keycode KeyCode = Event.key.keysym.sym;
+                bool IsDown = Event.key.state == SDL_PRESSED;
+                printf("[DEBUG] ProcessInput: KeyCode = %d, IsDown = %d.\n", KeyCode, IsDown);
+
+                if (Event.key.repeat == 0)
+                {
+                    if(KeyCode == SDLK_UP) 
+                    {
+                        SDLProcessKeyPress(&KeyboardController->MoveUp, IsDown);
+                    }
+                    else if(KeyCode == SDLK_LEFT) 
+                    {
+                        SDLProcessKeyPress(&KeyboardController->MoveLeft, IsDown);
+                    }
+                    else if(KeyCode == SDLK_DOWN) 
+                    {
+                        SDLProcessKeyPress(&KeyboardController->MoveDown, IsDown);
+                    }
+                    else if(KeyCode == SDLK_RIGHT) 
+                    {
+                        SDLProcessKeyPress(&KeyboardController->MoveRight, IsDown);
+                    }
+                    else if(KeyCode == SDLK_w) 
+                    {
+                        SDLProcessKeyPress(&KeyboardController->MoveUp, IsDown);
+                    }
+                    else if(KeyCode == SDLK_a) 
+                    {
+                        SDLProcessKeyPress(&KeyboardController->MoveLeft, IsDown);
+                    }
+                    else if(KeyCode == SDLK_s) 
+                    {
+                        SDLProcessKeyPress(&KeyboardController->MoveDown, IsDown);
+                    }
+                    else if(KeyCode == SDLK_d) 
+                    {
+                        SDLProcessKeyPress(&KeyboardController->MoveRight, IsDown);
+                    }
+                    else if(KeyCode == SDLK_ESCAPE)
+                    {
+                        printf("ESCAPE: ");
+                        if(IsDown)
+                        {
+                            printf("IsDown\n");
+                        }
+                    }
+                }
+            } break;
             case SDL_QUIT: 
             {
                 Running = false;
@@ -122,13 +196,13 @@ int main(int argc, char *argv[])
         printf("Loading SDL failed! %s\n", SDL_GetError());
         return -1;
     }
-    
-    // Setup Controller subsystem!
-    int ControllerCount = SDL_NumJoysticks();
 
-    // TODO: assert that ControllerCount <= MAX_CONTROLLERS
+    game_input Input[2] = {};
+    game_input *OldInput = &Input[0];
+    game_input *NewInput = &Input[1];
+
     SDL_GameController *ControllerHandles[MAX_CONTROLLERS];
-    int ConnectedControllerCount = SDLSetupGameControllers(ControllerCount, ControllerHandles);
+    int ConnectedControllerCount = SDLSetupGameControllers(ControllerHandles);
 
     // Setup Window
     const char *Title = "AWE Game Engine";
@@ -138,6 +212,11 @@ int main(int argc, char *argv[])
     int WindowHeight = 1024;
     int32_t CreateWindowFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
     SDL_Window *Window = SDL_CreateWindow(Title, Top, Left, WindowWidth, WindowHeight, CreateWindowFlags);
+    if (!Window) 
+    {
+        // TODO: Logging!
+        return -1;
+    }
     
     SDL_Renderer *Renderer = SDL_CreateRenderer(Window, -1, SDL_RENDERER_ACCELERATED);
     if (!Renderer) 
@@ -154,36 +233,34 @@ int main(int argc, char *argv[])
     offscreen_buffer.Pitch = offscreen_buffer.BytesPerPixel * newDim.Width;
     SDLResizeTexture(&offscreen_buffer, newDim, Renderer);
 
-    int XOffset = 0;
-    int YOffset = 0;
-
-    while (Running) 
+    while (Running)
     {
-        ProcessInput(&offscreen_buffer, Renderer);
+        game_controller_input *OldKeyboardController = &OldInput->KeyboardController[0];
+        game_controller_input *NewKeyboardController = &NewInput->KeyboardController[0];
+        // *NewKeyboardController = {0};
+        for(int ButtonIndex = 0; ButtonIndex < ArrayCount(NewKeyboardController->Buttons); ++ButtonIndex) {
+            NewKeyboardController->Buttons[ButtonIndex].EndedDown =
+            OldKeyboardController->Buttons[ButtonIndex].EndedDown;
+        }
+
+        ProcessInput(&offscreen_buffer, Renderer, &NewInput->KeyboardController[0]);
+
         for (int ControllerIndex = 0; ControllerIndex < ConnectedControllerCount; ++ControllerIndex)
         {
+            game_controller_input *OldController = &OldInput->Controllers[ControllerIndex];
+            game_controller_input *NewController = &NewInput->Controllers[ControllerIndex];
+
             SDL_GameController *Controller = ControllerHandles[ControllerIndex];
             if(Controller != NULL && SDL_GameControllerGetAttached(Controller))
             {
                 // TODO: process input from this connected GameController
 
-                if (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_UP))
-                {
-                    ++YOffset;
-                }
-                if (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN))
-                {
-                    --YOffset;
-                }
+                SDLProcessGameControllerButton(&(OldController->MoveUp), &(NewController->MoveUp), Controller, SDL_CONTROLLER_BUTTON_DPAD_UP);
+                SDLProcessGameControllerButton(&(OldController->MoveLeft), &(NewController->MoveLeft), Controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
+                SDLProcessGameControllerButton(&(OldController->MoveDown), &(NewController->MoveDown), Controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+                SDLProcessGameControllerButton(&(OldController->MoveRight), &(NewController->MoveRight), Controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
 
-                if (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT))
-                {
-                    ++XOffset;
-                }
-                if (SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT))
-                {
-                    --XOffset;
-                }
+                // TODO: process Joystick and Moar Buttons
             }
             else
             {
@@ -191,7 +268,12 @@ int main(int argc, char *argv[])
             }
         }
 
-        Render(&offscreen_buffer, XOffset, YOffset);
+        Render(&offscreen_buffer, NewInput);
+
+        game_input *Temp = NewInput;
+        NewInput = OldInput;
+        OldInput = Temp;
+
         SDLUpdateWindow(&offscreen_buffer, WindowTexture, Renderer);
     }
 

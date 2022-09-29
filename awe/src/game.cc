@@ -2,15 +2,32 @@
 
 #include "game.h"
 
-void Render(offscreen_buffer *buffer, int XOffset, int YOffset)
-{
-    int Pitch = buffer->Width * buffer->BytesPerPixel;
+static int XOffset = 0;
+static int YOffset = 0;
 
-    uint8_t *Row = (uint8_t *)buffer->Pixels;
-    for(int Y = 0; Y < buffer->Height; ++Y)
+void Render(offscreen_buffer *Buffer, game_input *Input)
+{
+    game_button_state *MoveUp = &Input->KeyboardController[0].MoveUp;
+
+    if (MoveUp->EndedDown) 
+    {
+        printf("MoveUp EndedDown\n");
+        YOffset++;
+    }
+    game_button_state *MoveLeft = &Input->KeyboardController[0].MoveLeft;
+    if (MoveLeft->EndedDown) 
+    {
+        printf("MoveLeft EndedDown\n");
+        XOffset++;
+    }
+
+    int Pitch = Buffer->Width * Buffer->BytesPerPixel;
+
+    uint8_t *Row = (uint8_t *)Buffer->Pixels;
+    for(int Y = 0; Y < Buffer->Height; ++Y)
     {
         uint32_t *Pixel = (uint32_t *)Row;
-        for(int X = 0; X < buffer->Width; ++X)
+        for(int X = 0; X < Buffer->Width; ++X)
         {
             uint8_t Blue = Y + YOffset;
             uint8_t Green = 0;
