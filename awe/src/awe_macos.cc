@@ -57,7 +57,7 @@ internal void SDLResizeTexture(offscreen_buffer *buffer, window_dimension NewDim
 internal int SDLSetupGameControllers(SDL_GameController *Result[]) {
     int ControllerCount = SDL_NumJoysticks();
     int ConnectedControllerCount = 0;
-    for(int ControllerIndex = 0; ControllerIndex < ControllerCount; ++ControllerIndex) {
+    for(int ControllerIndex = 1; ControllerIndex < ControllerCount; ++ControllerIndex) {
         if (!SDL_IsGameController(ControllerIndex))
         {
             printf("Not a game controller!\n");
@@ -216,15 +216,15 @@ int main(int argc, char *argv[])
 
     while (Running)
     {
-        game_controller_input *OldKeyboardController = &OldInput->KeyboardController[0];
-        game_controller_input *NewKeyboardController = &NewInput->KeyboardController[0];
+        game_controller_input *OldKeyboardController = &OldInput->Controllers[0];
+        game_controller_input *NewKeyboardController = &NewInput->Controllers[0];
         *NewKeyboardController = {0};
         for(int ButtonIndex = 0; ButtonIndex < ArrayCount(NewKeyboardController->Buttons); ++ButtonIndex) {
             NewKeyboardController->Buttons[ButtonIndex].EndedDown =
             OldKeyboardController->Buttons[ButtonIndex].EndedDown;
         }
 
-        ProcessInput(&offscreen_buffer, Renderer, &NewInput->KeyboardController[0]);
+        ProcessInput(&offscreen_buffer, Renderer, &NewInput->Controllers[Keyboard]);
 
         for (int ControllerIndex = 0; ControllerIndex < ConnectedControllerCount; ++ControllerIndex)
         {

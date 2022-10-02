@@ -1,7 +1,14 @@
 #ifndef GAME_H
 #define GAME_H
 
-#define MAX_CONTROLLERS 4
+enum controller_type {
+    Keyboard = 0,
+    Gamepad1 = 1,
+    Gamepad2 = 2,
+    Gamepad3 = 3,
+    Gamepad4 = 4,
+};
+#define MAX_CONTROLLERS 5
 
 struct offscreen_buffer 
 {
@@ -54,7 +61,6 @@ struct game_controller_input
 
 struct game_input
 {
-    game_controller_input KeyboardController[1];
 	game_controller_input Controllers[MAX_CONTROLLERS];
 };
 

@@ -7,7 +7,7 @@ static int YOffset = 0;
 
 void Render(offscreen_buffer *Buffer, game_input *Input)
 {
-    game_button_state *MoveUp = &Input->KeyboardController[0].MoveUp;
+    game_button_state *MoveUp = &Input->Controllers[0].MoveUp;
     if (MoveUp->HalfTransitionCount > 0) {
         printf("UP HalfTransitionCount = %d\n", MoveUp->HalfTransitionCount);
     }
@@ -16,7 +16,7 @@ void Render(offscreen_buffer *Buffer, game_input *Input)
         YOffset++;
     }
  
-    game_button_state *MoveLeft = &Input->KeyboardController[0].MoveLeft;
+    game_button_state *MoveLeft = &Input->Controllers[0].MoveLeft;
     if (MoveLeft->HalfTransitionCount > 0) {
         printf("LEFT HalfTransitionCount = %d\n", MoveLeft->HalfTransitionCount);
     }
