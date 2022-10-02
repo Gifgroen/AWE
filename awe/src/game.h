@@ -6,7 +6,7 @@ enum controller_type {
     Gamepad1 = 1,
     Gamepad2 = 2,
     Gamepad3 = 3,
-    Gamepad4 = 4,
+    Gamepad4 = 4
 };
 #define MAX_CONTROLLERS 5
 

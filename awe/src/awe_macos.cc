@@ -57,7 +57,7 @@ internal void SDLResizeTexture(offscreen_buffer *buffer, window_dimension NewDim
 internal int SDLSetupGameControllers(SDL_GameController *Result[]) {
     int ControllerCount = SDL_NumJoysticks();
     int ConnectedControllerCount = 0;
-    for(int ControllerIndex = 1; ControllerIndex < ControllerCount; ++ControllerIndex) {
+    for(int ControllerIndex = 0; ControllerIndex < ControllerCount; ++ControllerIndex) {
         if (!SDL_IsGameController(ControllerIndex))
         {
             printf("Not a game controller!\n");
@@ -92,11 +92,10 @@ internal void SDLProcessKeyPress(game_button_state *NewState, bool IsDown)
     }
     NewState->EndedDown = IsDown;
     ++NewState->HalfTransitionCount;
-
 }
 
 // Keyboard/Mouse Input 
-internal void ProcessInput(offscreen_buffer *buffer, SDL_Renderer *Renderer, game_controller_input *KeyboardController) 
+internal void ProcessInput(offscreen_buffer *buffer, game_controller_input *KeyboardController) 
 {
     SDL_Event Event;
 
@@ -109,7 +108,6 @@ internal void ProcessInput(offscreen_buffer *buffer, SDL_Renderer *Renderer, gam
             {
                 SDL_Keycode KeyCode = Event.key.keysym.sym;
                 bool IsDown = Event.key.state == SDL_PRESSED;
-                printf("[DEBUG] ProcessInput: KeyCode = %d, IsDown = %d.\n", KeyCode, IsDown);
 
                 if (Event.key.repeat == 0)
                 {
@@ -137,6 +135,8 @@ internal void ProcessInput(offscreen_buffer *buffer, SDL_Renderer *Renderer, gam
                             printf("IsDown\n");
                         }
                     }
+
+                    // TODO: define more necessary input.
                 }
             } break;
             case SDL_QUIT: 
@@ -183,7 +183,11 @@ int main(int argc, char *argv[])
     game_input *NewInput = &Input[1];
 
     SDL_GameController *ControllerHandles[MAX_CONTROLLERS];
-    int ConnectedControllerCount = SDLSetupGameControllers(ControllerHandles);
+    SDL_GameController *Gamepads[MAX_CONTROLLERS - 1];
+    int ConnectedControllerCount = SDLSetupGameControllers(Gamepads);
+    for (int i=0; i < ArrayCount(Gamepads); ++i) {
+        ControllerHandles[i+1] = Gamepads[i];
+    }
 
     // Setup Window
     const char *Title = "AWE Game Engine";
@@ -216,6 +220,7 @@ int main(int argc, char *argv[])
 
     while (Running)
     {
+        // NOTE: Store keyboard state of previous frame
         game_controller_input *OldKeyboardController = &OldInput->Controllers[0];
         game_controller_input *NewKeyboardController = &NewInput->Controllers[0];
         *NewKeyboardController = {0};
@@ -224,22 +229,30 @@ int main(int argc, char *argv[])
             OldKeyboardController->Buttons[ButtonIndex].EndedDown;
         }
 
-        ProcessInput(&offscreen_buffer, Renderer, &NewInput->Controllers[Keyboard]);
+        ProcessInput(&offscreen_buffer, &NewInput->Controllers[Keyboard]);
 
-        for (int ControllerIndex = 0; ControllerIndex < ConnectedControllerCount; ++ControllerIndex)
+        for (int ControllerIndex = Gamepad1; ControllerIndex < ConnectedControllerCount; ++ControllerIndex)
         {
-            game_controller_input *OldController = &OldInput->Controllers[ControllerIndex];
-            game_controller_input *NewController = &NewInput->Controllers[ControllerIndex];
-
             SDL_GameController *Controller = ControllerHandles[ControllerIndex];
             if(Controller != NULL && SDL_GameControllerGetAttached(Controller))
             {
                 // TODO: process input from this connected GameController
 
-                SDLProcessGameControllerButton(&(OldController->MoveUp), &(NewController->MoveUp), SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_UP));
-                SDLProcessGameControllerButton(&(OldController->MoveLeft), &(NewController->MoveLeft), SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT));
-                SDLProcessGameControllerButton(&(OldController->MoveDown), &(NewController->MoveDown), SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN));
-                SDLProcessGameControllerButton(&(OldController->MoveRight), &(NewController->MoveRight), SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT));
+                game_controller_input *OldController = &OldInput->Controllers[ControllerIndex];
+                game_controller_input *NewController = &NewInput->Controllers[ControllerIndex];
+
+                SDLProcessGameControllerButton(
+                    &(OldController->MoveUp), &(NewController->MoveUp),
+                    SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_UP));
+                SDLProcessGameControllerButton(
+                    &(OldController->MoveLeft), &(NewController->MoveLeft),
+                    SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT));
+                SDLProcessGameControllerButton(
+                    &(OldController->MoveDown), &(NewController->MoveDown),
+                    SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN));
+                SDLProcessGameControllerButton(
+                    &(OldController->MoveRight), &(NewController->MoveRight),
+                    SDL_GameControllerGetButton(Controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT));
 
                 // TODO: process Joystick and Moar Buttons
             }
